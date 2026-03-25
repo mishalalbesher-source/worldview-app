@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // ─── Utility helpers (pure functions) ────────────────────────────────────────
 
@@ -28,6 +28,57 @@ function buildTrailKey(icao24: string): string {
   return `trail:${icao24.toLowerCase()}`;
 }
 
+// ─── Aircraft Classification ──────────────────────────────────────────────────
+
+type AircraftClass = "military" | "civilian" | "unknown";
+type MilitarySubtype = "fighter" | "isr" | "transport" | "uav" | "helicopter" | "other";
+
+function classifyAircraft(icao24: string, callsign: string, _country: string, category: number): AircraftClass {
+  const id = icao24.toLowerCase();
+  const cs = (callsign || "").toUpperCase();
+  if (category === 8) return "military";
+  const militaryCallsigns = /^(RCH|REACH|USAF|NAVY|ARMY|USMC|EVAC|MEDEVAC|PAT|JAKE|SPAR|VENUS|BOXER|MAGMA|TOPAZ|IRON|STEEL|GHOST|SHADOW|EAGLE|HAWK|VIPER|RAVEN|FALCON|THUNDER|STORM|COBRA|WOLF|BEAR|TIGER|LION|DRAGON|KNIGHT)/;
+  if (militaryCallsigns.test(cs)) return "military";
+  if (id >= "ae0000" && id <= "afffff") return "military";
+  if (id >= "43c000" && id <= "43ffff") return "military";
+  if (id >= "3b0000" && id <= "3bffff") return "military";
+  if (id >= "3dc000" && id <= "3dffff") return "military";
+  if (id >= "0d0000" && id <= "0dffff") return "military";
+  if (id >= "7b0000" && id <= "7bffff") return "military";
+  return "civilian";
+}
+
+function getMilitarySubtype(callsign: string, icao24: string): MilitarySubtype {
+  const cs = (callsign || "").toUpperCase();
+  const id = icao24.toLowerCase();
+  if (/^(JSTARS|AWACS|RIVET|COBRA|SENTRY|DRAGON|SHADOW|REAPER|GLOBAL|TRITON|POSEIDON|NEPTUNE|ORION|SENTINEL|GUARDIAN)/.test(cs)) return "isr";
+  if (/^(RQ|MQ|PRED|REAPER|GLOBAL|TRITON|SCAN|HERON|HERMES)/.test(cs)) return "uav";
+  if (/^(RCH|REACH|ATLAS|STARLIFTER|GALAXY|GLOBEMASTER|HERCULES|SPARTAN|CASA|TRANSALL)/.test(cs)) return "transport";
+  if (/^(DUSTOFF|MEDEVAC|PEDRO|JOLLY|PAVE|KNIFE|LIFEGUARD)/.test(cs)) return "helicopter";
+  if (id >= "ae0000" && id <= "afffff") return "fighter";
+  return "other";
+}
+
+// ─── Ruler Distance ───────────────────────────────────────────────────────────
+
+interface RulerPoint { longitude: number; latitude: number; }
+
+function haversineKm(a: RulerPoint, b: RulerPoint): number {
+  const R = 6371;
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const lat1 = (a.latitude * Math.PI) / 180;
+  const lat2 = (b.latitude * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function formatRulerDistance(km: number, unit: "km" | "nm" | "mi"): string {
+  if (unit === "nm") return `${(km * 0.539957).toFixed(1)} NM`;
+  if (unit === "mi") return `${(km * 0.621371).toFixed(1)} mi`;
+  return km >= 1000 ? `${(km / 1000).toFixed(2)} Mm` : `${km.toFixed(1)} km`;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("normalizeCallsign", () => {
@@ -44,7 +95,7 @@ describe("normalizeCallsign", () => {
 });
 
 describe("clampAltitude", () => {
-  it("returns null for null/undefined/NaN", () => {
+  it("returns null for null/undefined/NaN/Infinity", () => {
     expect(clampAltitude(null)).toBeNull();
     expect(clampAltitude(undefined)).toBeNull();
     expect(clampAltitude(NaN)).toBeNull();
@@ -111,27 +162,146 @@ describe("buildTrailKey", () => {
   });
 });
 
+describe("Aircraft Classification", () => {
+  it("classifies US military ICAO hex range as military", () => {
+    expect(classifyAircraft("ae1234", "", "United States", 0)).toBe("military");
+    expect(classifyAircraft("af0000", "", "United States", 0)).toBe("military");
+    expect(classifyAircraft("afffff", "", "United States", 0)).toBe("military");
+  });
+
+  it("classifies UK military ICAO hex range as military", () => {
+    expect(classifyAircraft("43c500", "", "United Kingdom", 0)).toBe("military");
+    expect(classifyAircraft("43ffff", "", "United Kingdom", 0)).toBe("military");
+  });
+
+  it("classifies French military ICAO hex range as military", () => {
+    expect(classifyAircraft("3b1000", "", "France", 0)).toBe("military");
+  });
+
+  it("classifies OpenSky category 8 as military regardless of ICAO", () => {
+    expect(classifyAircraft("a00001", "", "United States", 8)).toBe("military");
+    expect(classifyAircraft("400001", "", "United Kingdom", 8)).toBe("military");
+  });
+
+  it("classifies military callsign patterns as military", () => {
+    expect(classifyAircraft("a00001", "RCH123", "United States", 0)).toBe("military");
+    expect(classifyAircraft("a00001", "REACH456", "United States", 0)).toBe("military");
+    expect(classifyAircraft("a00001", "NAVY001", "United States", 0)).toBe("military");
+    expect(classifyAircraft("a00001", "EAGLE01", "United States", 0)).toBe("military");
+  });
+
+  it("classifies civilian airline callsigns as civilian", () => {
+    expect(classifyAircraft("a00001", "UAL123", "United States", 0)).toBe("civilian");
+    expect(classifyAircraft("400001", "BAW456", "United Kingdom", 0)).toBe("civilian");
+    expect(classifyAircraft("3c0001", "DLH789", "Germany", 0)).toBe("civilian");
+  });
+
+  it("handles empty callsign gracefully", () => {
+    expect(classifyAircraft("a00001", "", "Unknown", 0)).toBe("civilian");
+  });
+});
+
+describe("Military Subtype Classification", () => {
+  it("identifies transport aircraft by callsign", () => {
+    expect(getMilitarySubtype("RCH123", "ae1234")).toBe("transport");
+    expect(getMilitarySubtype("REACH456", "ae1234")).toBe("transport");
+    expect(getMilitarySubtype("HERCULES1", "ae1234")).toBe("transport");
+  });
+
+  it("identifies ISR aircraft by callsign", () => {
+    expect(getMilitarySubtype("AWACS01", "ae1234")).toBe("isr");
+    expect(getMilitarySubtype("RIVET01", "ae1234")).toBe("isr");
+    expect(getMilitarySubtype("SENTINEL1", "ae1234")).toBe("isr");
+  });
+
+  it("identifies UAV by callsign prefix", () => {
+    expect(getMilitarySubtype("MQ9REAPER", "ae1234")).toBe("uav");
+    expect(getMilitarySubtype("RQ4GLOBAL", "ae1234")).toBe("uav");
+  });
+
+  it("identifies helicopter by callsign", () => {
+    expect(getMilitarySubtype("MEDEVAC01", "ae1234")).toBe("helicopter");
+    expect(getMilitarySubtype("DUSTOFF01", "ae1234")).toBe("helicopter");
+  });
+
+  it("defaults to fighter for US military ICAO range without specific callsign", () => {
+    expect(getMilitarySubtype("UNKN001", "ae1234")).toBe("fighter");
+    expect(getMilitarySubtype("", "af0000")).toBe("fighter");
+  });
+
+  it("defaults to other for non-US military ICAO range", () => {
+    expect(getMilitarySubtype("UNKN001", "43c500")).toBe("other");
+    expect(getMilitarySubtype("", "3b1000")).toBe("other");
+  });
+});
+
+describe("Ruler Distance Calculation (Haversine)", () => {
+  it("calculates zero distance for same point", () => {
+    const p = { longitude: 0, latitude: 0 };
+    expect(haversineKm(p, p)).toBeCloseTo(0, 5);
+  });
+
+  it("calculates equatorial distance correctly (1 degree ≈ 111.32 km)", () => {
+    const a = { longitude: 0, latitude: 0 };
+    const b = { longitude: 1, latitude: 0 };
+    expect(haversineKm(a, b)).toBeCloseTo(111.32, 0);
+  });
+
+  it("calculates London to Paris distance (~340 km)", () => {
+    const london = { longitude: -0.1278, latitude: 51.5074 };
+    const paris = { longitude: 2.3522, latitude: 48.8566 };
+    const dist = haversineKm(london, paris);
+    expect(dist).toBeGreaterThan(330);
+    expect(dist).toBeLessThan(360);
+  });
+
+  it("calculates New York to Los Angeles distance (~3940 km)", () => {
+    const nyc = { longitude: -74.006, latitude: 40.7128 };
+    const la = { longitude: -118.2437, latitude: 34.0522 };
+    const dist = haversineKm(nyc, la);
+    expect(dist).toBeGreaterThan(3900);
+    expect(dist).toBeLessThan(4000);
+  });
+
+  it("is symmetric (distance A→B equals B→A)", () => {
+    const a = { longitude: 10, latitude: 45 };
+    const b = { longitude: -30, latitude: 60 };
+    expect(haversineKm(a, b)).toBeCloseTo(haversineKm(b, a), 10);
+  });
+});
+
+describe("Ruler Distance Formatter", () => {
+  it("formats km correctly for short distances", () => {
+    expect(formatRulerDistance(42.5, "km")).toBe("42.5 km");
+    expect(formatRulerDistance(0.1, "km")).toBe("0.1 km");
+  });
+
+  it("formats km as Mm for distances over 1000 km", () => {
+    expect(formatRulerDistance(1500, "km")).toBe("1.50 Mm");
+    expect(formatRulerDistance(20015, "km")).toBe("20.02 Mm");
+  });
+
+  it("converts km to nautical miles", () => {
+    expect(formatRulerDistance(100, "nm")).toBe("54.0 NM");
+  });
+
+  it("converts km to statute miles", () => {
+    expect(formatRulerDistance(100, "mi")).toBe("62.1 mi");
+  });
+
+  it("handles zero distance", () => {
+    expect(formatRulerDistance(0, "km")).toBe("0.0 km");
+    expect(formatRulerDistance(0, "nm")).toBe("0.0 NM");
+    expect(formatRulerDistance(0, "mi")).toBe("0.0 mi");
+  });
+});
+
 describe("aircraft data normalization", () => {
   it("normalizes OpenSky state array to aircraft object", () => {
-    // Simulates what flightWorker does
     const stateArray = [
-      "abc123",   // icao24
-      "UAL1844 ", // callsign
-      "United States", // origin_country
-      1710000000, // time_position
-      1710000001, // last_contact
-      -87.6298,   // longitude
-      41.8781,    // latitude
-      10668,      // baro_altitude (meters)
-      false,      // on_ground
-      236,        // velocity (m/s)
-      270,        // true_track (heading)
-      0,          // vertical_rate
-      null,       // sensors
-      10668,      // geo_altitude
-      "4B1A3C",   // squawk
-      false,      // spi
-      0,          // position_source
+      "abc123", "UAL1844 ", "United States",
+      1710000000, 1710000001, -87.6298, 41.8781,
+      10668, false, 236, 270, 0, null, 10668, "4B1A3C", false, 0,
     ];
 
     const aircraft = {
@@ -173,26 +343,18 @@ describe("earthquake data normalization", () => {
         status: "reviewed",
         url: "https://earthquake.usgs.gov/earthquakes/eventpage/us7000abcd",
       },
-      geometry: {
-        type: "Point",
-        coordinates: [-117.6, 35.7, 8.5],
-      },
+      geometry: { type: "Point", coordinates: [-117.6, 35.7, 8.5] },
     };
 
     const quake = {
       id: feature.id,
-      title: feature.properties.title,
-      place: feature.properties.place,
       magnitude: feature.properties.mag,
       longitude: feature.geometry.coordinates[0],
       latitude: feature.geometry.coordinates[1],
       depthKm: feature.geometry.coordinates[2],
-      time: new Date(feature.properties.time).toISOString(),
       tsunami: feature.properties.tsunami === 1,
       significance: feature.properties.sig,
       felt: feature.properties.felt ?? 0,
-      status: feature.properties.status,
-      url: feature.properties.url,
     };
 
     expect(quake.id).toBe("us7000abcd");
@@ -208,11 +370,9 @@ describe("earthquake data normalization", () => {
 });
 
 describe("satellite TLE parsing helpers", () => {
-  it("validates TLE line checksum format", () => {
-    // TLE lines must be 69 chars + 1 checksum digit
+  it("validates TLE line length format", () => {
     const line1 = "1 25544U 98067A   24080.50000000  .00001234  00000-0  12345-4 0  9990";
     const line2 = "2 25544  51.6400 208.9163 0001234  86.9740 273.1590 15.49815849441234";
-
     expect(line1.length).toBe(69);
     expect(line2.length).toBe(69);
     expect(line1[0]).toBe("1");

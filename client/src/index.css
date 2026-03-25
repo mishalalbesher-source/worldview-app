@@ -3,6 +3,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─── Design Tokens ─────────────────────────────────────────────────────────
+   C2 Operational Theme — Military/Hybrid
+   Primary palette: deep charcoal base, amber gold accents, cyan data overlays
+   Typography: Space Grotesk (headings) + JetBrains Mono (data/labels)
+   ─────────────────────────────────────────────────────────────────────────── */
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -40,85 +46,133 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Custom operational tokens */
+  --color-op-amber: var(--op-amber);
+  --color-op-amber-dim: var(--op-amber-dim);
+  --color-op-cyan: var(--op-cyan);
+  --color-op-red: var(--op-red);
+  --color-op-green: var(--op-green);
+  --color-op-panel: var(--op-panel);
+  --color-op-panel-border: var(--op-panel-border);
+  --color-op-surface: var(--op-surface);
+  --color-op-military: var(--op-military);
+  --color-op-civilian: var(--op-civilian);
 }
 
+/* ─── Light Theme (Analytical / Clean) ─────────────────────────────────────── */
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --radius: 0.5rem;
+
+  /* Operational accent palette */
+  --op-amber: oklch(0.75 0.18 65);
+  --op-amber-dim: oklch(0.65 0.14 65);
+  --op-cyan: oklch(0.72 0.14 200);
+  --op-red: oklch(0.62 0.22 25);
+  --op-green: oklch(0.65 0.18 145);
+  --op-panel: oklch(0.97 0.003 240);
+  --op-panel-border: oklch(0.88 0.005 240);
+  --op-surface: oklch(0.93 0.005 240);
+  --op-military: oklch(0.55 0.16 30);
+  --op-civilian: oklch(0.50 0.14 220);
+
+  /* Shadcn/ui tokens — light analytical */
+  --background: oklch(0.96 0.004 240);
+  --foreground: oklch(0.18 0.012 240);
+  --card: oklch(0.99 0.002 240);
+  --card-foreground: oklch(0.18 0.012 240);
+  --popover: oklch(0.99 0.002 240);
+  --popover-foreground: oklch(0.18 0.012 240);
+  --primary: oklch(0.75 0.18 65);
+  --primary-foreground: oklch(0.12 0.01 65);
+  --secondary: oklch(0.91 0.006 240);
+  --secondary-foreground: oklch(0.28 0.01 240);
+  --muted: oklch(0.91 0.006 240);
+  --muted-foreground: oklch(0.52 0.012 240);
+  --accent: oklch(0.91 0.006 240);
+  --accent-foreground: oklch(0.18 0.012 240);
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.86 0.006 240);
+  --input: oklch(0.86 0.006 240);
+  --ring: oklch(0.75 0.18 65);
+  --chart-1: oklch(0.75 0.18 65);
+  --chart-2: oklch(0.72 0.14 200);
+  --chart-3: oklch(0.62 0.22 25);
+  --chart-4: oklch(0.65 0.18 145);
+  --chart-5: oklch(0.60 0.16 280);
+  --sidebar: oklch(0.99 0.002 240);
+  --sidebar-foreground: oklch(0.18 0.012 240);
+  --sidebar-primary: oklch(0.75 0.18 65);
+  --sidebar-primary-foreground: oklch(0.12 0.01 65);
+  --sidebar-accent: oklch(0.91 0.006 240);
+  --sidebar-accent-foreground: oklch(0.18 0.012 240);
+  --sidebar-border: oklch(0.86 0.006 240);
+  --sidebar-ring: oklch(0.75 0.18 65);
 }
 
+/* ─── Dark Operational Theme (Default C2) ───────────────────────────────────── */
 .dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  --radius: 0.5rem;
+
+  /* Operational accent palette — dark */
+  --op-amber: oklch(0.78 0.19 68);
+  --op-amber-dim: oklch(0.62 0.13 68);
+  --op-cyan: oklch(0.74 0.15 198);
+  --op-red: oklch(0.68 0.22 22);
+  --op-green: oklch(0.68 0.18 145);
+  --op-panel: oklch(0.14 0.008 240);
+  --op-panel-border: oklch(0.22 0.010 240);
+  --op-surface: oklch(0.18 0.009 240);
+  --op-military: oklch(0.70 0.17 30);
+  --op-civilian: oklch(0.72 0.14 198);
+
+  /* Shadcn/ui tokens — dark C2 */
+  /* Base: deep charcoal-navy, NOT pure black */
+  --background: oklch(0.115 0.010 240);
+  --foreground: oklch(0.88 0.006 240);
+  --card: oklch(0.155 0.010 240);
+  --card-foreground: oklch(0.88 0.006 240);
+  --popover: oklch(0.155 0.010 240);
+  --popover-foreground: oklch(0.88 0.006 240);
+  /* Primary = amber gold (operational accent) */
+  --primary: oklch(0.78 0.19 68);
+  --primary-foreground: oklch(0.10 0.01 68);
+  --secondary: oklch(0.20 0.010 240);
+  --secondary-foreground: oklch(0.72 0.008 240);
+  --muted: oklch(0.22 0.010 240);
+  --muted-foreground: oklch(0.55 0.012 240);
+  --accent: oklch(0.22 0.010 240);
+  --accent-foreground: oklch(0.90 0.006 240);
+  --destructive: oklch(0.68 0.22 22);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.78 0.19 68);
+  /* Charts: amber → cyan → red → green → violet */
+  --chart-1: oklch(0.78 0.19 68);
+  --chart-2: oklch(0.74 0.15 198);
+  --chart-3: oklch(0.68 0.22 22);
+  --chart-4: oklch(0.68 0.18 145);
+  --chart-5: oklch(0.68 0.18 290);
+  --sidebar: oklch(0.155 0.010 240);
+  --sidebar-foreground: oklch(0.88 0.006 240);
+  --sidebar-primary: oklch(0.78 0.19 68);
+  --sidebar-primary-foreground: oklch(0.10 0.01 68);
+  --sidebar-accent: oklch(0.22 0.010 240);
+  --sidebar-accent-foreground: oklch(0.90 0.006 240);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.78 0.19 68);
 }
 
+/* ─── Base Layer ─────────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "kern" 1, "liga" 1;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -133,25 +187,13 @@
   }
 }
 
+/* ─── Component Layer ────────────────────────────────────────────────────────── */
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -162,16 +204,149 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
+  }
+
+  /* ── Operational Panel ─────────────────────────────────────────────────────── */
+  .op-panel {
+    background: var(--op-panel);
+    border: 1px solid var(--op-panel-border);
+    border-radius: var(--radius);
+  }
+
+  .op-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--op-panel-border);
+    font-family: 'Space Grotesk', 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ── Scan-line overlay for C2 aesthetic ───────────────────────────────────── */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      oklch(0 0 0 / 0.04) 2px,
+      oklch(0 0 0 / 0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── Amber glow for active/selected items ─────────────────────────────────── */
+  .glow-amber {
+    box-shadow: 0 0 12px oklch(0.78 0.19 68 / 0.35), 0 0 4px oklch(0.78 0.19 68 / 0.5);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 12px oklch(0.74 0.15 198 / 0.35), 0 0 4px oklch(0.74 0.15 198 / 0.5);
+  }
+
+  .glow-red {
+    box-shadow: 0 0 12px oklch(0.68 0.22 22 / 0.45), 0 0 4px oklch(0.68 0.22 22 / 0.6);
+  }
+
+  /* ── Data label typography ─────────────────────────────────────────────────── */
+  .data-label {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+  }
+
+  .data-value {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Military badge ────────────────────────────────────────────────────────── */
+  .badge-military {
+    background: oklch(0.68 0.22 22 / 0.2);
+    border: 1px solid oklch(0.68 0.22 22 / 0.5);
+    color: oklch(0.80 0.18 22);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+  }
+
+  .badge-civilian {
+    background: oklch(0.74 0.15 198 / 0.15);
+    border: 1px solid oklch(0.74 0.15 198 / 0.4);
+    color: oklch(0.78 0.12 198);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+  }
+
+  /* ── Ruler tool ────────────────────────────────────────────────────────────── */
+  .ruler-tooltip {
+    background: oklch(0.12 0.01 240 / 0.92);
+    border: 1px solid oklch(0.78 0.19 68 / 0.6);
+    color: oklch(0.78 0.19 68);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ── Scrollbar styling ─────────────────────────────────────────────────────── */
+  .op-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .op-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .op-scroll::-webkit-scrollbar-thumb {
+    background: oklch(0.78 0.19 68 / 0.3);
+    border-radius: 2px;
+  }
+  .op-scroll::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.78 0.19 68 / 0.5);
+  }
+
+  /* ── Pulsing live indicator ────────────────────────────────────────────────── */
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .live-pulse {
+    animation: live-pulse 2s ease-in-out infinite;
+  }
+
+  /* ── Grid overlay for analytical feel ─────────────────────────────────────── */
+  .grid-bg {
+    background-image:
+      linear-gradient(oklch(1 0 0 / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }

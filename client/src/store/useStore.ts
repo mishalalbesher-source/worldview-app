@@ -1,5 +1,72 @@
 import { create } from "zustand";
 
+// ─── Aircraft Classification ──────────────────────────────────────────────────
+// Based on ICAO hex ranges, callsign patterns, and OpenSky category field
+export type AircraftClass = "military" | "civilian" | "unknown";
+export type MilitarySubtype = "fighter" | "isr" | "transport" | "uav" | "helicopter" | "other";
+
+export function classifyAircraft(icao24: string, callsign: string, country: string, category: number): AircraftClass {
+  const id = icao24.toLowerCase();
+  const cs = (callsign || "").toUpperCase();
+
+  // OpenSky category 8 = military (when available)
+  if (category === 8) return "military";
+
+  // Known military callsign patterns
+  const militaryCallsigns = /^(RCH|RCF|REACH|USAF|NAVY|ARMY|USMC|MARCE|EVAC|MEDEVAC|PAT|JAKE|SPAR|VENUS|BOXER|MAGMA|TOPAZ|IRON|STEEL|GHOST|SHADOW|EAGLE|HAWK|VIPER|RAVEN|FALCON|THUNDER|STORM|COBRA|WOLF|BEAR|TIGER|LION|DRAGON|KNIGHT|SWORD|LANCE|SHIELD|ARMOR|FORGE|ANVIL|HAMMER|BLADE|ARROW|SPEAR|DART|BOLT|FLASH|SPARK|FLAME|FIRE|SMOKE|DUST|SAND|ROCK|STONE|IRON|STEEL|BRASS|GOLD|SILVER|BRONZE|COPPER|ZINC|LEAD|CHROME|TITAN|ATLAS|ZEUS|THOR|ARES|MARS|APOLLO|ORION|PEGASUS|HERMES|MERCURY|SATURN|JUPITER|NEPTUNE|PLUTO|COMET|METEOR|NOVA|STAR|SUN|MOON|EARTH|ORBIT|COSMO|ASTRO|LUNA|SOLAR|GALAX|NEBULA|PULSAR|QUASAR|RADAR|SONAR|LASER|MASER|SONIC|ULTRA|HYPER|SUPER|MEGA|MACRO|MICRO|NANO|PICO|TERA|GIGA|KILO|MILLI|CENTI|DECI|HECTO)/;
+  if (militaryCallsigns.test(cs)) return "military";
+
+  // ICAO hex ranges for military aircraft (well-known ranges)
+  // US Military: ADF7C0-ADFFFF, AE0000-AFFFFF
+  if (id >= "ae0000" && id <= "afffff") return "military";
+  // UK Military: 43C000-43FFFF
+  if (id >= "43c000" && id <= "43ffff") return "military";
+  // French Military: 3B0000-3BFFFF
+  if (id >= "3b0000" && id <= "3bffff") return "military";
+  // German Military: 3DC000-3DFFFF
+  if (id >= "3dc000" && id <= "3dffff") return "military";
+  // Russian Military: 0D0000-0DFFFF
+  if (id >= "0d0000" && id <= "0dffff") return "military";
+  // Chinese Military: 7B0000-7BFFFF
+  if (id >= "7b0000" && id <= "7bffff") return "military";
+
+  return "civilian";
+}
+
+export function getMilitarySubtype(callsign: string, icao24: string): MilitarySubtype {
+  const cs = (callsign || "").toUpperCase();
+  const id = icao24.toLowerCase();
+
+  // ISR patterns (Reconnaissance/Surveillance)
+  if (/^(JSTARS|AWACS|RIVET|COBRA|SENTRY|DRAGON|SHADOW|REAPER|GLOBAL|TRITON|POSEIDON|NEPTUNE|ORION|SENTINEL|GUARDIAN)/.test(cs)) return "isr";
+  // UAV/Drone patterns
+  if (/^(RQ|MQ|PRED|REAPER|GLOBAL|TRITON|SCAN|HERON|HERMES)/.test(cs)) return "uav";
+  // Transport patterns
+  if (/^(RCH|REACH|ATLAS|STARLIFTER|GALAXY|GLOBEMASTER|HERCULES|SPARTAN|CASA|TRANSALL)/.test(cs)) return "transport";
+  // Helicopter patterns
+  if (/^(DUSTOFF|MEDEVAC|PEDRO|JOLLY|PAVE|KNIFE|LIFEGUARD)/.test(cs)) return "helicopter";
+  // Fighter/attack (default military if none above)
+  if (id >= "ae0000" && id <= "afffff") return "fighter";
+  return "other";
+}
+
+// ─── Ruler / Distance Measurement ────────────────────────────────────────────
+export interface RulerPoint {
+  longitude: number;
+  latitude: number;
+}
+
+export type RulerUnit = "km" | "nm" | "mi";
+
+export interface RulerState {
+  active: boolean;
+  points: RulerPoint[];
+  unit: RulerUnit;
+  totalDistance: number; // in km
+  segmentDistances: number[]; // in km
+}
+
+// ─── Data Models ──────────────────────────────────────────────────────────────
 export interface Aircraft {
   id: string;
   callsign: string;
@@ -15,6 +82,9 @@ export interface Aircraft {
   trail: number[][];
   last_seen: string;
   source: string;
+  // Classification (derived client-side)
+  aircraftClass?: AircraftClass;
+  militarySubtype?: MilitarySubtype;
 }
 
 export interface Satellite {
@@ -131,6 +201,7 @@ export interface LayerConfig {
   opacity?: number;
 }
 
+// ─── Store Interface ──────────────────────────────────────────────────────────
 interface WorldViewState {
   // Connection
   status: "connecting" | "connected" | "reconnecting" | "degraded";
@@ -157,12 +228,17 @@ interface WorldViewState {
   selectedEntity: SelectedEntity | null;
   imageryPreset: "ion" | "osm" | "dark";
   visualMode: "normal" | "green" | "mono";
+  theme: "dark" | "light";
   panels: { left: boolean; right: boolean; bottom: boolean };
   activeTab: "aircraft" | "satellites" | "earthquakes" | "webcams" | "weather";
   filters: {
     globalSearch: string;
     earthquakes: { minMagnitude: number };
+    aircraft: { classFilter: "all" | "military" | "civilian" };
   };
+
+  // Ruler tool
+  ruler: RulerState;
 
   // Actions
   setStatus: (s: WorldViewState["status"]) => void;
@@ -178,14 +254,46 @@ interface WorldViewState {
   setSelectedEntity: (e: SelectedEntity | null) => void;
   setImageryPreset: (p: WorldViewState["imageryPreset"]) => void;
   setVisualMode: (m: WorldViewState["visualMode"]) => void;
+  toggleTheme: () => void;
   updateLayer: (key: keyof WorldViewState["layers"], patch: Partial<LayerConfig>) => void;
   togglePanel: (key: keyof WorldViewState["panels"]) => void;
   setActiveTab: (tab: WorldViewState["activeTab"]) => void;
   setGlobalSearch: (s: string) => void;
   setMinMagnitude: (m: number) => void;
+  setAircraftClassFilter: (f: "all" | "military" | "civilian") => void;
   clearSelection: () => void;
+
+  // Ruler actions
+  toggleRuler: () => void;
+  addRulerPoint: (point: RulerPoint) => void;
+  removeLastRulerPoint: () => void;
+  clearRuler: () => void;
+  setRulerUnit: (unit: RulerUnit) => void;
 }
 
+// ─── Great-circle distance (Haversine) ───────────────────────────────────────
+function haversineKm(a: RulerPoint, b: RulerPoint): number {
+  const R = 6371;
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const lat1 = (a.latitude * Math.PI) / 180;
+  const lat2 = (b.latitude * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function computeRulerDistances(points: RulerPoint[]): { segments: number[]; total: number } {
+  const segments: number[] = [];
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const d = haversineKm(points[i - 1], points[i]);
+    segments.push(d);
+    total += d;
+  }
+  return { segments, total };
+}
+
+// ─── Store ────────────────────────────────────────────────────────────────────
 const useStore = create<WorldViewState>((set) => ({
   status: "connecting",
   lastMessageAt: null,
@@ -207,13 +315,35 @@ const useStore = create<WorldViewState>((set) => ({
   selectedEntity: null,
   imageryPreset: "osm",
   visualMode: "normal",
+  theme: "dark",
   panels: { left: true, right: true, bottom: true },
   activeTab: "aircraft",
-  filters: { globalSearch: "", earthquakes: { minMagnitude: 2 } },
+  filters: {
+    globalSearch: "",
+    earthquakes: { minMagnitude: 2 },
+    aircraft: { classFilter: "all" },
+  },
+  ruler: {
+    active: false,
+    points: [],
+    unit: "km",
+    totalDistance: 0,
+    segmentDistances: [],
+  },
 
   setStatus: (status) => set({ status }),
   setLastMessageAt: (lastMessageAt) => set({ lastMessageAt }),
-  setAircraft: (aircraft) => set({ aircraft }),
+  setAircraft: (raw) => {
+    // Enrich with classification on ingest
+    const aircraft = raw.map(a => ({
+      ...a,
+      aircraftClass: classifyAircraft(a.id, a.callsign, a.country, a.category),
+      militarySubtype: classifyAircraft(a.id, a.callsign, a.country, a.category) === "military"
+        ? getMilitarySubtype(a.callsign, a.id)
+        : undefined,
+    }));
+    set({ aircraft });
+  },
   setSatellites: (satellites) => set({ satellites }),
   setWebcams: (webcams) => set({ webcams }),
   setEarthquakes: (earthquakes) => set({ earthquakes }),
@@ -224,6 +354,11 @@ const useStore = create<WorldViewState>((set) => ({
   setSelectedEntity: (selectedEntity) => set({ selectedEntity }),
   setImageryPreset: (imageryPreset) => set({ imageryPreset }),
   setVisualMode: (visualMode) => set({ visualMode }),
+  toggleTheme: () => set((state) => {
+    const next = state.theme === "dark" ? "light" : "dark";
+    document.documentElement.classList.toggle("dark", next === "dark");
+    return { theme: next };
+  }),
   updateLayer: (key, patch) =>
     set((state) => ({
       layers: { ...state.layers, [key]: { ...state.layers[key], ...patch } },
@@ -237,7 +372,28 @@ const useStore = create<WorldViewState>((set) => ({
     set((state) => ({ filters: { ...state.filters, globalSearch } })),
   setMinMagnitude: (minMagnitude) =>
     set((state) => ({ filters: { ...state.filters, earthquakes: { ...state.filters.earthquakes, minMagnitude } } })),
+  setAircraftClassFilter: (classFilter) =>
+    set((state) => ({ filters: { ...state.filters, aircraft: { classFilter } } })),
   clearSelection: () => set({ selectedEntity: null }),
+
+  // Ruler actions
+  toggleRuler: () => set((state) => ({
+    ruler: { ...state.ruler, active: !state.ruler.active, points: [], totalDistance: 0, segmentDistances: [] },
+  })),
+  addRulerPoint: (point) => set((state) => {
+    const points = [...state.ruler.points, point];
+    const { segments, total } = computeRulerDistances(points);
+    return { ruler: { ...state.ruler, points, segmentDistances: segments, totalDistance: total } };
+  }),
+  removeLastRulerPoint: () => set((state) => {
+    const points = state.ruler.points.slice(0, -1);
+    const { segments, total } = computeRulerDistances(points);
+    return { ruler: { ...state.ruler, points, segmentDistances: segments, totalDistance: total } };
+  }),
+  clearRuler: () => set((state) => ({
+    ruler: { ...state.ruler, points: [], totalDistance: 0, segmentDistances: [] },
+  })),
+  setRulerUnit: (unit) => set((state) => ({ ruler: { ...state.ruler, unit } })),
 }));
 
 export default useStore;

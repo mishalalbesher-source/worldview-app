@@ -33,7 +33,24 @@
 ## Testing
 - [x] Write vitest for WorldView data normalization utilities
 - [x] Write vitest for earthquake data normalization
-- [x] All 18 tests passing
+- [x] All 41 tests passing (18 original + 23 new classification/ruler tests)
 
 ## Deployment
-- [ ] Save checkpoint and publish
+- [x] Save checkpoint and publish
+
+## Redesign Phase
+- [x] Full color system redesign - new dark operational theme (C2/military-hybrid)
+- [x] New typography pairing (analytical platform feel)
+- [x] CSS design tokens / variables overhaul
+- [x] Light theme toggle
+- [x] Aircraft classification: military vs civilian visual differentiation
+- [x] Military sub-types: Fighter, ISR, Transport, UAV
+- [x] Aircraft classification legend panel
+- [x] Military/civilian filter toggle
+- [x] Professional SVG icon set (unified stroke/scale)
+- [x] Distance measurement ruler tool (click-to-measure, great-circle)
+- [x] Ruler: segment + total distance display
+- [x] Ruler: km / NM / miles unit toggle
+- [x] Ruler: draggable anchor points, reset/delete
+- [x] UI layout overhaul - grid-based analytical platform composition
+- [x] Glow/emphasis effects for selected objects
