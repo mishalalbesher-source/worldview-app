@@ -17,9 +17,9 @@ export class WorldViewManager {
 
   constructor(httpServer: HttpServer) {
     this.io = new SocketIOServer(httpServer, {
-      path: "/ws",
+      path: "/socket.io",
       cors: { origin: "*", methods: ["GET", "POST"] },
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
     });
 
     this.io.on("connection", (socket: Socket) => {

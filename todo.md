@@ -71,3 +71,18 @@
 - [x] Performance: maxVisible cap on vessel layer (500), aircraft list capped at 80
 - [x] Modular codebase refactor - separate workers (flight/maritime/earthquake/satellite/weather)
 - [x] Update vitest tests - 41 tests passing
+
+## Production Integration Fix
+- [x] Diagnose WebSocket/Socket.IO connection failure in production
+- [x] Fix Socket.IO CORS and transport config for production domain
+- [x] Fix API endpoint paths for production (no Vite proxy)
+- [x] Fix Socket.IO path changed from /ws to /socket.io (production proxy compatible)
+- [x] Verify all data feeds work after deployment
+
+## Icon Redesign
+- [x] Larger, clearer aircraft icon (44px airliner silhouette for civilian, 44px delta-wing for military)
+- [x] Callsign label always visible below each aircraft icon (bold 12px, dark outline, fade at altitude)
+- [x] Distinct vessel/ship icon (40px hull with bow arrow, glow ring, vessel name label always visible)
+- [x] Webcam icon (36px camera body with lens + recording dot, location name label always visible)
+- [x] Military aircraft use distinct color/icon vs civilian (orange/red delta-wing vs cyan airliner)
+- [x] Save checkpoint and redeploy

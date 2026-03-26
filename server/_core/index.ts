@@ -59,7 +59,7 @@ async function startServer() {
   // WorldView REST endpoints
   app.get("/api/health", (_req, res) => {
     const snapshot = manager.getSnapshot();
-    res.json({ status: "ok", websocketPath: "/ws", feedStatus: snapshot.feedStatus, timestamp: snapshot.timestamp });
+    res.json({ status: "ok", websocketPath: "/socket.io", feedStatus: snapshot.feedStatus, timestamp: snapshot.timestamp });
   });
 
   app.get("/api/dashboard/snapshot", (_req, res) => {

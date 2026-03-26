@@ -6,7 +6,7 @@ import type { Aircraft, Satellite, Earthquake, Webcam, Vessel, VesselCategory } 
 declare const Cesium: any;
 
 // ─── Canvas Icon Factory ──────────────────────────────────────────────────────
-function makeCanvasIcon(drawFn: (ctx: CanvasRenderingContext2D, size: number) => void, size = 28): HTMLCanvasElement {
+function makeCanvasIcon(drawFn: (ctx: CanvasRenderingContext2D, size: number) => void, size = 44): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext("2d")!;
@@ -14,70 +14,126 @@ function makeCanvasIcon(drawFn: (ctx: CanvasRenderingContext2D, size: number) =>
   return canvas;
 }
 
-// Civilian aircraft — rounded, neutral cyan-white
-function getCivilianPlaneIcon(heading = 0, size = 28): HTMLCanvasElement {
+// Civilian aircraft — clean commercial airliner silhouette
+function getCivilianPlaneIcon(heading = 0, size = 44): HTMLCanvasElement {
   return makeCanvasIcon((ctx, s) => {
     ctx.save();
     ctx.translate(s / 2, s / 2);
     ctx.rotate(((heading - 90) * Math.PI) / 180);
     ctx.translate(-s / 2, -s / 2);
-    // Body
-    ctx.fillStyle = "#67e8f9"; // cyan-300
+    const cx = s / 2;
+
+    // Outer glow ring
+    ctx.shadowColor = "#67e8f9";
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = "rgba(103,232,249,0.35)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(s / 2, 2);
-    ctx.bezierCurveTo(s / 2 + 3, s * 0.35, s / 2 + 4, s * 0.55, s / 2 + 2, s * 0.65);
-    ctx.lineTo(s - 3, s * 0.75);
-    ctx.lineTo(s / 2 + 2, s * 0.65);
-    ctx.lineTo(s / 2 + 2, s - 4);
-    ctx.lineTo(s / 2, s - 3);
-    ctx.lineTo(s / 2 - 2, s - 4);
-    ctx.lineTo(s / 2 - 2, s * 0.65);
-    ctx.lineTo(3, s * 0.75);
-    ctx.lineTo(s / 2 - 2, s * 0.65);
-    ctx.bezierCurveTo(s / 2 - 4, s * 0.55, s / 2 - 3, s * 0.35, s / 2, 2);
+    ctx.arc(cx, cx, s * 0.46, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Fuselage (vertical body)
+    ctx.fillStyle = "#e0f7fa";
+    ctx.beginPath();
+    ctx.ellipse(cx, cx, s * 0.09, s * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main wings (horizontal)
+    ctx.fillStyle = "#67e8f9";
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.44, cx + s * 0.06); // left wingtip
+    ctx.lineTo(cx - s * 0.12, cx - s * 0.06); // left wing root leading
+    ctx.lineTo(cx + s * 0.12, cx - s * 0.06); // right wing root leading
+    ctx.lineTo(cx + s * 0.44, cx + s * 0.06); // right wingtip
+    ctx.lineTo(cx + s * 0.28, cx + s * 0.14); // right wing trailing
+    ctx.lineTo(cx + s * 0.10, cx + s * 0.10); // right root trailing
+    ctx.lineTo(cx - s * 0.10, cx + s * 0.10); // left root trailing
+    ctx.lineTo(cx - s * 0.28, cx + s * 0.14); // left wing trailing
     ctx.closePath();
     ctx.fill();
-    // Center dot
-    ctx.fillStyle = "#0e7490"; // cyan-700
+
+    // Tail fins
+    ctx.fillStyle = "#38bdf8";
     ctx.beginPath();
-    ctx.arc(s / 2, s * 0.5, 2.5, 0, Math.PI * 2);
+    ctx.moveTo(cx - s * 0.16, cx + s * 0.28); // left tail tip
+    ctx.lineTo(cx - s * 0.06, cx + s * 0.18); // left tail root
+    ctx.lineTo(cx + s * 0.06, cx + s * 0.18); // right tail root
+    ctx.lineTo(cx + s * 0.16, cx + s * 0.28); // right tail tip
+    ctx.lineTo(cx + s * 0.08, cx + s * 0.32);
+    ctx.lineTo(cx - s * 0.08, cx + s * 0.32);
+    ctx.closePath();
     ctx.fill();
+
+    // Cockpit windows
+    ctx.fillStyle = "#0e7490";
+    ctx.beginPath();
+    ctx.ellipse(cx, cx - s * 0.22, s * 0.055, s * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(103,232,249,0.6)";
+    ctx.beginPath();
+    ctx.ellipse(cx, cx - s * 0.22, s * 0.03, s * 0.055, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }, size);
 }
 
-// Military aircraft — angular, tactical amber-red
-function getMilitaryPlaneIcon(heading = 0, subtype = "other", size = 28): HTMLCanvasElement {
-  const color = subtype === "fighter" ? "#f97316"    // orange-500
-    : subtype === "isr" ? "#a78bfa"                  // violet-400
-    : subtype === "transport" ? "#fbbf24"            // amber-400
-    : subtype === "uav" ? "#f43f5e"                  // rose-500
-    : subtype === "helicopter" ? "#fb923c"           // orange-400
-    : "#ef4444";                                     // red-500
+// Military aircraft — angular delta-wing tactical silhouette
+function getMilitaryPlaneIcon(heading = 0, subtype = "other", size = 44): HTMLCanvasElement {
+  const color = subtype === "fighter" ? "#f97316"
+    : subtype === "isr" ? "#a78bfa"
+    : subtype === "transport" ? "#fbbf24"
+    : subtype === "uav" ? "#f43f5e"
+    : subtype === "helicopter" ? "#fb923c"
+    : "#ef4444";
+  const glowColor = color;
 
   return makeCanvasIcon((ctx, s) => {
     ctx.save();
     ctx.translate(s / 2, s / 2);
     ctx.rotate(((heading - 90) * Math.PI) / 180);
     ctx.translate(-s / 2, -s / 2);
-    // Angular tactical silhouette (delta wing shape)
+    const cx = s / 2;
+
+    // Glow ring
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = glowColor + "55";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cx, s * 0.46, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Delta wing body
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(s / 2, 1);          // nose
-    ctx.lineTo(s - 2, s * 0.72);  // right wing tip
-    ctx.lineTo(s * 0.62, s * 0.58); // right wing root
-    ctx.lineTo(s * 0.58, s - 3);   // right tail
-    ctx.lineTo(s / 2, s * 0.82);   // tail center
-    ctx.lineTo(s * 0.42, s - 3);   // left tail
-    ctx.lineTo(s * 0.38, s * 0.58); // left wing root
-    ctx.lineTo(2, s * 0.72);       // left wing tip
+    ctx.moveTo(cx, s * 0.04);          // nose tip
+    ctx.lineTo(s * 0.96, s * 0.74);   // right wingtip
+    ctx.lineTo(s * 0.64, s * 0.60);   // right wing root
+    ctx.lineTo(s * 0.60, s * 0.88);   // right tail fin
+    ctx.lineTo(cx, s * 0.76);         // tail center
+    ctx.lineTo(s * 0.40, s * 0.88);   // left tail fin
+    ctx.lineTo(s * 0.36, s * 0.60);   // left wing root
+    ctx.lineTo(s * 0.04, s * 0.74);   // left wingtip
     ctx.closePath();
     ctx.fill();
-    // Cockpit highlight
-    ctx.fillStyle = "rgba(255,255,255,0.25)";
+
+    // Cockpit canopy
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
     ctx.beginPath();
-    ctx.ellipse(s / 2, s * 0.32, 2.5, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, s * 0.30, s * 0.055, s * 0.11, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Center spine line
+    ctx.strokeStyle = "rgba(0,0,0,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, s * 0.04);
+    ctx.lineTo(cx, s * 0.76);
+    ctx.stroke();
+
     ctx.restore();
   }, size);
 }
@@ -136,7 +192,7 @@ function getEarthquakeIcon(magnitude: number, size = 24): HTMLCanvasElement {
 }
 
 // Vessel icons — color-coded by category
-function getVesselIcon(category: VesselCategory, heading = 0, size = 24): HTMLCanvasElement {
+function getVesselIcon(category: VesselCategory, heading = 0, size = 40): HTMLCanvasElement {
   const colorMap: Record<VesselCategory, string> = {
     cargo: "#60a5fa",       // blue-400
     tanker: "#f97316",      // orange-500
@@ -154,67 +210,146 @@ function getVesselIcon(category: VesselCategory, heading = 0, size = 24): HTMLCa
     ctx.translate(s / 2, s / 2);
     ctx.rotate(((heading - 90) * Math.PI) / 180);
     ctx.translate(-s / 2, -s / 2);
-    // Ship hull — elongated diamond/arrow shape
+    const cx = s / 2;
+
+    // Glow ring
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = color + "44";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cx, s * 0.44, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Ship hull — pointed bow, wide beam, flat stern
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(s / 2, 2);           // bow
-    ctx.lineTo(s * 0.75, s * 0.55); // starboard midship
-    ctx.lineTo(s * 0.65, s - 3);    // starboard stern
-    ctx.lineTo(s / 2, s * 0.82);    // stern notch
-    ctx.lineTo(s * 0.35, s - 3);    // port stern
-    ctx.lineTo(s * 0.25, s * 0.55); // port midship
+    ctx.moveTo(cx, s * 0.06);           // bow tip (sharp)
+    ctx.bezierCurveTo(
+      cx + s * 0.28, s * 0.22,          // starboard bow curve
+      cx + s * 0.32, s * 0.50,          // starboard beam
+      cx + s * 0.28, s * 0.78           // starboard stern
+    );
+    ctx.lineTo(cx - s * 0.28, s * 0.78); // stern (flat)
+    ctx.bezierCurveTo(
+      cx - s * 0.32, s * 0.50,          // port beam
+      cx - s * 0.28, s * 0.22,          // port bow curve
+      cx, s * 0.06                       // back to bow
+    );
     ctx.closePath();
     ctx.fill();
-    // Superstructure
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
+
+    // Deck outline
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Superstructure / bridge block
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.beginPath();
-    ctx.rect(s * 0.38, s * 0.38, s * 0.24, s * 0.22);
+    ctx.roundRect(cx - s * 0.12, s * 0.36, s * 0.24, s * 0.22, 2);
     ctx.fill();
+
+    // Bow arrow indicator
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.beginPath();
+    ctx.moveTo(cx, s * 0.08);
+    ctx.lineTo(cx - s * 0.05, s * 0.18);
+    ctx.lineTo(cx + s * 0.05, s * 0.18);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.restore();
   }, size);
 }
 
-function getWebcamIcon(size = 22): HTMLCanvasElement {
+function getWebcamIcon(size = 36): HTMLCanvasElement {
   return makeCanvasIcon((ctx, s) => {
-    // Camera body
-    ctx.fillStyle = "#4ade80"; // green-400
+    const cx = s / 2;
+
+    // Glow ring
+    ctx.shadowColor = "#4ade80";
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = "rgba(74,222,128,0.3)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(s * 0.08, s * 0.28, s * 0.72, s * 0.5, 3);
-    ctx.fill();
-    // Lens
-    ctx.fillStyle = "#052e16"; // green-950
+    ctx.arc(cx, cx, s * 0.46, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Camera body — rounded rectangle
+    ctx.fillStyle = "#166534"; // dark green body
     ctx.beginPath();
-    ctx.arc(s * 0.44, s * 0.53, s * 0.18, 0, Math.PI * 2);
+    ctx.roundRect(s * 0.10, s * 0.26, s * 0.70, s * 0.48, 4);
     ctx.fill();
-    ctx.fillStyle = "#4ade80";
+    ctx.strokeStyle = "#4ade80";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Viewfinder bump on top
+    ctx.fillStyle = "#166534";
     ctx.beginPath();
-    ctx.arc(s * 0.44, s * 0.53, s * 0.09, 0, Math.PI * 2);
+    ctx.roundRect(s * 0.34, s * 0.16, s * 0.22, s * 0.12, 2);
     ctx.fill();
-    // Flash
-    ctx.fillStyle = "#4ade80";
-    ctx.fillRect(s * 0.7, s * 0.35, s * 0.18, s * 0.1);
-    // Viewfinder bump
-    ctx.fillRect(s * 0.35, s * 0.2, s * 0.18, s * 0.1);
-    // Recording dot
+    ctx.strokeStyle = "#4ade80";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Lens outer ring
+    ctx.fillStyle = "#052e16";
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.04, s * 0.50, s * 0.17, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#4ade80";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Lens inner glass
+    ctx.fillStyle = "#0d9488"; // teal glass
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.04, s * 0.50, s * 0.10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Lens highlight
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.beginPath();
+    ctx.arc(cx - s * 0.07, s * 0.44, s * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Recording dot (red, right side)
     ctx.fillStyle = "#ef4444";
+    ctx.shadowColor = "#ef4444";
+    ctx.shadowBlur = 4;
     ctx.beginPath();
-    ctx.arc(s * 0.72, s * 0.55, s * 0.07, 0, Math.PI * 2);
+    ctx.arc(s * 0.70, s * 0.38, s * 0.065, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Flash bar
+    ctx.fillStyle = "#4ade80";
+    ctx.beginPath();
+    ctx.roundRect(s * 0.65, s * 0.52, s * 0.10, s * 0.16, 2);
     ctx.fill();
   }, size);
 }
 
 // ─── Label helper ─────────────────────────────────────────────────────────────
-function makeLabel(text: string, color?: any) {
+function makeLabel(text: string, color?: any, offsetY = -28) {
   return {
     text: text || "",
-    font: "500 10px 'JetBrains Mono', monospace",
+    font: "bold 12px 'JetBrains Mono', monospace",
     fillColor: color || Cesium.Color.fromCssColorString("#67e8f9"),
-    outlineColor: Cesium.Color.BLACK,
-    outlineWidth: 3,
+    outlineColor: Cesium.Color.fromCssColorString("#000000"),
+    outlineWidth: 4,
     style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-    pixelOffset: new Cesium.Cartesian2(0, -20),
-    scaleByDistance: new Cesium.NearFarScalar(1e4, 1.0, 5e6, 0.0),
+    pixelOffset: new Cesium.Cartesian2(0, offsetY),
+    scaleByDistance: new Cesium.NearFarScalar(5e3, 1.0, 4e6, 0.0),
+    translucencyByDistance: new Cesium.NearFarScalar(2e6, 1.0, 5e6, 0.0),
     show: true,
+    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+    disableDepthTestDistance: Number.POSITIVE_INFINITY,
   };
 }
 
@@ -532,20 +667,18 @@ export default function CesiumViewer() {
         entity.position = Cesium.Cartesian3.fromDegrees(a.longitude!, a.latitude!, a.altitude ?? 0);
         entity.billboard = {
           image: icon,
-          width: isMilitary ? 28 : 24,
-          height: isMilitary ? 28 : 24,
+          width: 44,
+          height: 44,
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.2, 8e6, 0.4),
+          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.0, 8e6, 0.3),
           pixelOffset: new Cesium.Cartesian2(0, 0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         };
-        if (layers.aircraft.showLabels) {
-          const labelColor = isMilitary
-            ? Cesium.Color.fromCssColorString("#f97316")
-            : Cesium.Color.fromCssColorString("#67e8f9");
-          entity.label = makeLabel(a.callsign || a.id, labelColor);
-        } else {
-          entity.label = undefined;
-        }
+        // Always show callsign label
+        const labelColor = isMilitary
+          ? Cesium.Color.fromCssColorString("#f97316")
+          : Cesium.Color.fromCssColorString("#67e8f9");
+        entity.label = makeLabel(a.callsign || a.id, labelColor, -26);
         entity.properties = new Cesium.PropertyBag({
           entityType: "aircraft",
           itemId: a.id,
@@ -633,11 +766,14 @@ export default function CesiumViewer() {
         entity.position = Cesium.Cartesian3.fromDegrees(w.longitude, w.latitude, 50);
         entity.billboard = {
           image: getWebcamIcon(),
-          width: 20,
-          height: 20,
+          width: 36,
+          height: 36,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.2, 5e6, 0.4),
+          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.2, 4e6, 0.4),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         };
+        // Always show webcam location label
+        entity.label = makeLabel(w.name || w.id, Cesium.Color.fromCssColorString("#4ade80"), -22);
         entity.properties = new Cesium.PropertyBag({ entityType: "webcams", itemId: w.id });
       },
     });
@@ -807,16 +943,14 @@ export default function CesiumViewer() {
         entity.position = Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, 10);
         entity.billboard = {
           image: getVesselIcon(v.typeCategory, heading),
-          width: 22,
-          height: 22,
+          width: 40,
+          height: 40,
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.3, 8e6, 0.4),
+          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.0, 8e6, 0.3),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         };
-        if (layers.vessels?.showLabels) {
-          entity.label = makeLabel(v.name || v.mmsi, Cesium.Color.fromCssColorString("#60a5fa"));
-        } else {
-          entity.label = undefined;
-        }
+        // Always show vessel name label
+        entity.label = makeLabel(v.name || v.mmsi, Cesium.Color.fromCssColorString("#60a5fa"), -26);
         entity.properties = new Cesium.PropertyBag({ entityType: "vessels", itemId: v.mmsi });
         // Vessel trail
         if (layers.vessels?.showTrails && v.trail && v.trail.length > 1) {
