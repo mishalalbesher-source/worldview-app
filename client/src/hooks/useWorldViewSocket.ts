@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import useStore from "@/store/useStore";
-import type { Aircraft, Satellite, Earthquake, Webcam, WeatherConfig, WeatherSummary, WeatherAlert, FeedStatus } from "@/store/useStore";
+import type { Aircraft, Satellite, Earthquake, Webcam, WeatherConfig, WeatherSummary, WeatherAlert, FeedStatus, Vessel, Anomaly } from "@/store/useStore";
 
 const aircraftTrails = new Map<string, number[][]>();
 
@@ -34,6 +34,9 @@ export function useWorldViewSocket() {
     setWeatherSummary,
     setAlerts,
     setFeedStatus,
+    setVessels,
+    addAnomalies,
+    setAvailableTimestamps,
   } = useStore();
 
   useEffect(() => {
@@ -87,13 +90,31 @@ export function useWorldViewSocket() {
         case "feed_status":
           setFeedStatus(message.data as Record<string, FeedStatus>);
           break;
+        case "vessel_updates":
+          setVessels(Array.isArray(message.data) ? (message.data as Vessel[]) : []);
+          break;
+        case "anomaly_updates":
+          addAnomalies(Array.isArray(message.data) ? (message.data as Anomaly[]) : []);
+          break;
         default:
           break;
       }
     });
 
+    // Load history timestamps on connect
+    socket.on("connect", async () => {
+      setStatus("connected");
+      try {
+        const res = await fetch("/api/history/timestamps");
+        if (res.ok) {
+          const data = await res.json() as { timestamps: number[] };
+          setAvailableTimestamps(data.timestamps ?? []);
+        }
+      } catch { /* ignore */ }
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [setStatus, setLastMessageAt, setAircraft, setSatellites, setWebcams, setEarthquakes, setWeatherConfig, setWeatherSummary, setAlerts, setFeedStatus]);
+  }, [setStatus, setLastMessageAt, setAircraft, setSatellites, setWebcams, setEarthquakes, setWeatherConfig, setWeatherSummary, setAlerts, setFeedStatus, setVessels, addAnomalies, setAvailableTimestamps]);
 }

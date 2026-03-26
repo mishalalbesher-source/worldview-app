@@ -13,6 +13,9 @@ import { startSatelliteWorker } from "../workers/satelliteWorker";
 import { startEarthquakeWorker } from "../workers/earthquakeWorker";
 import { startWeatherWorker } from "../workers/weatherWorker";
 import { startWebcamWorker, CURATED_WEBCAMS } from "../workers/webcamWorker";
+import { startMaritimeWorker } from "../workers/maritimeWorker";
+import { getHistoryBuffer } from "../historyBuffer";
+import { getAnomalies, acknowledgeAnomaly, clearAcknowledged } from "../anomalyEngine";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -67,6 +70,38 @@ async function startServer() {
     res.json({ items: CURATED_WEBCAMS.map(cam => ({ ...cam, proxySnapshotUrl: `/api/webcams/${cam.id}/snapshot` })) });
   });
 
+  // History timeline endpoints
+  app.get("/api/history/summary", (_req, res) => {
+    res.json(getHistoryBuffer().getSummary());
+  });
+
+  app.get("/api/history/timestamps", (_req, res) => {
+    res.json({ timestamps: getHistoryBuffer().getTimestamps() });
+  });
+
+  app.get("/api/history/snapshot", (req, res) => {
+    const ts = parseInt(String(req.query.ts ?? "0"), 10);
+    if (!ts) { res.status(400).json({ error: "ts query param required" }); return; }
+    const snapshot = getHistoryBuffer().getSnapshotAt(ts);
+    if (!snapshot) { res.status(404).json({ error: "No history available yet" }); return; }
+    res.json(snapshot);
+  });
+
+  // Anomaly endpoints
+  app.get("/api/anomalies", (_req, res) => {
+    res.json({ anomalies: getAnomalies() });
+  });
+
+  app.post("/api/anomalies/:id/acknowledge", (req, res) => {
+    const ok = acknowledgeAnomaly(req.params.id);
+    res.json({ success: ok });
+  });
+
+  app.post("/api/anomalies/clear-acknowledged", (_req, res) => {
+    clearAcknowledged();
+    res.json({ success: true });
+  });
+
   app.get("/api/webcams/:webcamId/snapshot", async (req, res) => {
     const webcam = CURATED_WEBCAMS.find(c => c.id === req.params.webcamId);
     if (!webcam) { res.status(404).json({ error: "Unknown webcam" }); return; }
@@ -109,6 +144,7 @@ async function startServer() {
     startEarthquakeWorker(manager).catch(console.error);
     startWeatherWorker(manager).catch(console.error);
     startWebcamWorker(manager).catch(console.error);
+    startMaritimeWorker(manager).catch(console.error);
     console.log("[WorldView] Background workers started");
   });
 }

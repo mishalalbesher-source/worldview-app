@@ -1,4 +1,6 @@
 import { WorldViewManager } from "../wsManager";
+import { getHistoryBuffer } from "../historyBuffer";
+import { analyzeEarthquakes } from "../anomalyEngine";
 
 const USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
 const POLL_INTERVAL = 180_000; // 3 minutes
@@ -51,6 +53,28 @@ export async function startEarthquakeWorker(manager: WorldViewManager): Promise<
 
       earthquakes.sort((a, b) => (b.time ?? "").localeCompare(a.time ?? ""));
 
+      // Feed history buffer
+      getHistoryBuffer().updateEarthquakes(earthquakes.map(e => ({
+        id: e.id,
+        lat: e.latitude,
+        lon: e.longitude,
+        magnitude: e.magnitude,
+        place: e.place,
+        time: e.time,
+      })));
+      // Run anomaly detection
+      const newAnomalies = analyzeEarthquakes(earthquakes.map(e => ({
+        id: e.id,
+        place: e.place,
+        magnitude: e.magnitude,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        tsunami: e.tsunami,
+        time: e.time,
+      })));
+      if (newAnomalies.length > 0) {
+        manager.broadcast("anomaly_updates", newAnomalies);
+      }
       manager.broadcast("earthquake_updates", earthquakes);
       manager.updateFeedStatus("earthquakes", {
         status: "live",

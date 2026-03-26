@@ -1,4 +1,6 @@
 import { WorldViewManager } from "../wsManager";
+import { getHistoryBuffer } from "../historyBuffer";
+import { analyzeAircraft } from "../anomalyEngine";
 
 const OPENSKY_URL = "https://opensky-network.org/api/states/all";
 const POLL_INTERVAL = 30_000; // 30 seconds
@@ -127,6 +129,33 @@ export async function startFlightWorker(manager: WorldViewManager): Promise<void
       }
     }
 
+    // Feed history buffer
+    const hb = getHistoryBuffer();
+    hb.updateAircraft(payload.map(a => ({
+      id: a.id,
+      callsign: a.callsign,
+      lat: a.latitude ?? 0,
+      lon: a.longitude ?? 0,
+      alt: a.altitude,
+      heading: a.heading,
+      velocity: a.velocity,
+      onGround: a.onGround,
+      country: a.country,
+    })));
+    // Run anomaly detection
+    const newAnomalies = analyzeAircraft(payload.map(a => ({
+      id: a.id,
+      callsign: a.callsign,
+      latitude: a.latitude,
+      longitude: a.longitude,
+      altitude: a.altitude,
+      verticalRate: a.verticalRate,
+      onGround: a.onGround,
+      country: a.country,
+    })));
+    if (newAnomalies.length > 0) {
+      manager.broadcast("anomaly_updates", newAnomalies);
+    }
     manager.broadcast("aircraft_updates", payload);
     manager.updateFeedStatus("aircraft", {
       status,

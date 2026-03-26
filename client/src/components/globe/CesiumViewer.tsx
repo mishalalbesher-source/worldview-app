@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import useStore from "@/store/useStore";
-import type { Aircraft, Satellite, Earthquake, Webcam } from "@/store/useStore";
+import type { Aircraft, Satellite, Earthquake, Webcam, Vessel, VesselCategory } from "@/store/useStore";
 
 // Cesium is loaded via CDN script tag in index.html
 declare const Cesium: any;
@@ -135,6 +135,45 @@ function getEarthquakeIcon(magnitude: number, size = 24): HTMLCanvasElement {
   }, size);
 }
 
+// Vessel icons — color-coded by category
+function getVesselIcon(category: VesselCategory, heading = 0, size = 24): HTMLCanvasElement {
+  const colorMap: Record<VesselCategory, string> = {
+    cargo: "#60a5fa",       // blue-400
+    tanker: "#f97316",      // orange-500
+    passenger: "#a78bfa",   // violet-400
+    military: "#ef4444",    // red-500
+    sar: "#4ade80",         // green-400
+    fishing: "#fbbf24",     // amber-400
+    pleasure: "#f0abfc",    // fuchsia-300
+    tug: "#94a3b8",         // slate-400
+    other: "#64748b",       // slate-500
+  };
+  const color = colorMap[category] ?? "#64748b";
+  return makeCanvasIcon((ctx, s) => {
+    ctx.save();
+    ctx.translate(s / 2, s / 2);
+    ctx.rotate(((heading - 90) * Math.PI) / 180);
+    ctx.translate(-s / 2, -s / 2);
+    // Ship hull — elongated diamond/arrow shape
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(s / 2, 2);           // bow
+    ctx.lineTo(s * 0.75, s * 0.55); // starboard midship
+    ctx.lineTo(s * 0.65, s - 3);    // starboard stern
+    ctx.lineTo(s / 2, s * 0.82);    // stern notch
+    ctx.lineTo(s * 0.35, s - 3);    // port stern
+    ctx.lineTo(s * 0.25, s * 0.55); // port midship
+    ctx.closePath();
+    ctx.fill();
+    // Superstructure
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.beginPath();
+    ctx.rect(s * 0.38, s * 0.38, s * 0.24, s * 0.22);
+    ctx.fill();
+    ctx.restore();
+  }, size);
+}
+
 function getWebcamIcon(size = 22): HTMLCanvasElement {
   return makeCanvasIcon((ctx, s) => {
     // Camera body
@@ -229,6 +268,8 @@ export default function CesiumViewer() {
   const satelliteSourceRef = useRef<any>(null);
   const webcamSourceRef = useRef<any>(null);
   const earthquakeSourceRef = useRef<any>(null);
+  const vesselSourceRef = useRef<any>(null);
+  const vesselEntitiesRef = useRef<Map<string, any>>(new Map());
   const weatherLayerRef = useRef<any>(null);
   const rulerSourceRef = useRef<any>(null);
   const aircraftEntitiesRef = useRef<Map<string, any>>(new Map());
@@ -237,6 +278,7 @@ export default function CesiumViewer() {
   const earthquakeEntitiesRef = useRef<Map<string, any>>(new Map());
 
   const aircraft = useStore(s => s.aircraft);
+  const vessels = useStore(s => s.vessels);
   const satellites = useStore(s => s.satellites);
   const webcams = useStore(s => s.webcams);
   const earthquakes = useStore(s => s.earthquakes);
@@ -294,17 +336,20 @@ export default function CesiumViewer() {
     const webcamSource = new Cesium.CustomDataSource("webcams");
     const earthquakeSource = new Cesium.CustomDataSource("earthquakes");
     const rulerSource = new Cesium.CustomDataSource("ruler");
+    const vesselSource = new Cesium.CustomDataSource("vessels");
     viewer.dataSources.add(aircraftSource);
     viewer.dataSources.add(satelliteSource);
     viewer.dataSources.add(webcamSource);
     viewer.dataSources.add(earthquakeSource);
     viewer.dataSources.add(rulerSource);
+    viewer.dataSources.add(vesselSource);
 
     aircraftSourceRef.current = aircraftSource;
     satelliteSourceRef.current = satelliteSource;
     webcamSourceRef.current = webcamSource;
     earthquakeSourceRef.current = earthquakeSource;
     rulerSourceRef.current = rulerSource;
+    vesselSourceRef.current = vesselSource;
     viewerRef.current = viewer;
     setViewerReady(true);
 
@@ -731,6 +776,9 @@ export default function CesiumViewer() {
     } else if (selectedEntity.type === "webcams") {
       const w = webcams.find(x => x.id === selectedEntity.id);
       if (w) target = { lon: w.longitude, lat: w.latitude, alt: 200_000 };
+    } else if (selectedEntity.type === "vessels") {
+      const v = vessels.find(x => x.mmsi === selectedEntity.id);
+      if (v) target = { lon: v.longitude, lat: v.latitude, alt: 300_000 };
     }
 
     if (target) {
@@ -741,6 +789,55 @@ export default function CesiumViewer() {
       });
     }
   }, [selectedEntity]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Vessels ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!vesselSourceRef.current || !viewerRef.current) return;
+    const visibleVessels = layers.vessels?.visible
+      ? vessels.filter(v => v.latitude !== null && v.longitude !== null).slice(0, layers.vessels?.maxVisible ?? 500)
+      : [];
+
+    syncCollection<Vessel & { id: string }>({
+      source: vesselSourceRef.current,
+      mapRef: vesselEntitiesRef,
+      items: visibleVessels.map(v => ({ ...v, id: v.mmsi })),
+      idPrefix: "vs",
+      buildEntity: (entity, v) => {
+        const heading = v.heading ?? v.course ?? 0;
+        entity.position = Cesium.Cartesian3.fromDegrees(v.longitude, v.latitude, 10);
+        entity.billboard = {
+          image: getVesselIcon(v.typeCategory, heading),
+          width: 22,
+          height: 22,
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          scaleByDistance: new Cesium.NearFarScalar(1e4, 1.3, 8e6, 0.4),
+        };
+        if (layers.vessels?.showLabels) {
+          entity.label = makeLabel(v.name || v.mmsi, Cesium.Color.fromCssColorString("#60a5fa"));
+        } else {
+          entity.label = undefined;
+        }
+        entity.properties = new Cesium.PropertyBag({ entityType: "vessels", itemId: v.mmsi });
+        // Vessel trail
+        if (layers.vessels?.showTrails && v.trail && v.trail.length > 1) {
+          const positions = v.trail.map(([lon, lat]) =>
+            Cesium.Cartesian3.fromDegrees(lon, lat, 10)
+          );
+          entity.polyline = {
+            positions,
+            width: 1.5,
+            material: new Cesium.PolylineGlowMaterialProperty({
+              glowPower: 0.1,
+              color: Cesium.Color.fromCssColorString("#60a5fa").withAlpha(0.5),
+            }),
+          };
+        } else {
+          entity.polyline = undefined;
+        }
+      },
+    });
+    viewerRef.current.scene.requestRender();
+  }, [vessels, layers.vessels]);
 
   // ── Cursor style for ruler mode ─────────────────────────────────────────────
   useEffect(() => {

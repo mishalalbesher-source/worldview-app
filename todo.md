@@ -54,3 +54,20 @@
 - [x] Ruler: draggable anchor points, reset/delete
 - [x] UI layout overhaul - grid-based analytical platform composition
 - [x] Glow/emphasis effects for selected objects
+
+## Major Upgrade Phase (OSINT Intelligence Platform)
+- [x] Maritime AIS vessel tracking layer (AISStream.io WebSocket, demo mode active)
+- [x] Ship icons, vessel type classification, route trails on globe
+- [x] Vessel detail panel (MMSI, flag, type, speed, destination, ETA)
+- [x] Timeline/playback system - live mode + historical scrubbing
+- [x] History buffer (server-side ring buffer for last 2h of positions)
+- [x] Timeline scrubber UI component with play/pause/speed controls
+- [x] Anomaly detection engine (route deviation, clustering, disappearance)
+- [x] Anomaly alert panel with severity levels (scrollable, acknowledge action)
+- [x] Advanced layer filters (vessel category, aircraft class, earthquake magnitude)
+- [ ] Satellite future pass projection (next 90 min orbit path) - deferred
+- [x] Entity detail panel upgrade - vessel detail with full metadata
+- [x] Alert/event notification panel (anomaly panel in left sidebar)
+- [x] Performance: maxVisible cap on vessel layer (500), aircraft list capped at 80
+- [x] Modular codebase refactor - separate workers (flight/maritime/earthquake/satellite/weather)
+- [x] Update vitest tests - 41 tests passing

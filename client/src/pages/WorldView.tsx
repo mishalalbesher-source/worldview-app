@@ -6,10 +6,11 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Layers, Eye, EyeOff,
   AlertTriangle, Thermometer, Wind, Cloud, Zap, MapPin, X,
   Ruler, Trash2, RotateCcw, Shield, Users, ScanLine, Target,
-  Sun, Moon
+  Sun, Moon, Ship, Bell, BellOff, Play, Pause, SkipBack, Clock,
+  Anchor, Navigation, Filter, ChevronDown as ChevDown
 } from "lucide-react";
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import type { RulerUnit } from "@/store/useStore";
+import type { RulerUnit, VesselCategory, AnomalySeverity } from "@/store/useStore";
 
 const CesiumViewer = lazy(() => import("@/components/globe/CesiumViewer"));
 
@@ -275,6 +276,273 @@ function EarthquakeList() {
   );
 }
 
+// ─── Vessel List ─────────────────────────────────────────────────────────────
+function VesselList() {
+  const vessels = useStore(s => s.vessels);
+  const setSelectedEntity = useStore(s => s.setSelectedEntity);
+  const categoryFilter = useStore(s => s.filters.vessels.categoryFilter);
+  const setVesselCategoryFilter = useStore(s => s.setVesselCategoryFilter);
+
+  const VESSEL_COLORS: Record<string, string> = {
+    cargo: "#60a5fa", tanker: "#f97316", passenger: "#a78bfa",
+    military: "#ef4444", sar: "#4ade80", fishing: "#fbbf24",
+    pleasure: "#f0abfc", tug: "#94a3b8", other: "#64748b", all: "#94a3b8",
+  };
+
+  const categories: Array<{ key: string; label: string }> = [
+    { key: "all", label: `All (${vessels.length})` },
+    { key: "cargo", label: `Cargo (${vessels.filter(v => v.typeCategory === "cargo").length})` },
+    { key: "tanker", label: `Tanker (${vessels.filter(v => v.typeCategory === "tanker").length})` },
+    { key: "military", label: `MIL (${vessels.filter(v => v.typeCategory === "military").length})` },
+    { key: "passenger", label: `Pass (${vessels.filter(v => v.typeCategory === "passenger").length})` },
+  ];
+
+  const filtered = vessels
+    .filter(v => categoryFilter === "all" || v.typeCategory === categoryFilter)
+    .slice(0, 80);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-1">
+        {categories.map(opt => (
+          <button
+            key={opt.key}
+            className="rounded px-1.5 py-0.5 data-label uppercase tracking-wider border transition-all"
+            style={categoryFilter === opt.key
+              ? { background: `${VESSEL_COLORS[opt.key]}18`, borderColor: `${VESSEL_COLORS[opt.key]}50`, color: VESSEL_COLORS[opt.key] }
+              : { background: "transparent", borderColor: "rgba(255,255,255,0.06)", color: "rgba(148,163,184,0.5)" }
+            }
+            onClick={() => setVesselCategoryFilter(opt.key as any)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {/* Vessel rows */}
+      <div className="space-y-0.5 max-h-56 overflow-y-auto op-scroll pr-0.5">
+        {filtered.length === 0 ? (
+          <div className="py-4 text-center data-label text-slate-500">No vessels available</div>
+        ) : filtered.map(v => {
+          const color = VESSEL_COLORS[v.typeCategory] ?? "#64748b";
+          return (
+            <button
+              key={v.mmsi}
+              className="w-full flex items-center gap-2 rounded px-2.5 py-1.5 text-left transition-all border border-transparent"
+              style={{ background: "rgba(255,255,255,0.025)" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${color}30`; (e.currentTarget as HTMLElement).style.background = `${color}08`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "transparent"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.025)"; }}
+              onClick={() => setSelectedEntity({ type: "vessels", id: v.mmsi })}
+            >
+              <Ship className="h-3 w-3 shrink-0" style={{ color }} />
+              <div className="flex-1 min-w-0">
+                <div className="data-value text-slate-200 truncate" style={{ fontSize: "0.72rem" }}>{v.name || v.mmsi}</div>
+                <div className="data-label text-slate-500 truncate">{v.flag} · {v.typeName}</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="data-label" style={{ color }}>{v.speed != null ? `${v.speed.toFixed(1)} kn` : "—"}</div>
+                <div className="data-label text-slate-500">{v.destination || "—"}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Anomaly Panel ────────────────────────────────────────────────────────────
+function AnomalyPanel() {
+  const anomalies = useStore(s => s.anomalies);
+  const acknowledgeAnomaly = useStore(s => s.acknowledgeAnomaly);
+  const unacknowledgedCount = useStore(s => s.unacknowledgedAnomalyCount);
+
+  const SEVERITY_COLORS: Record<AnomalySeverity, string> = {
+    critical: "#ef4444",
+    warning: "#f59e0b",
+    info: "#60a5fa",
+  };
+
+  const DOMAIN_ICONS: Record<string, any> = {
+    aircraft: Plane,
+    maritime: Ship,
+    earthquake: AlertTriangle,
+    satellite: Satellite,
+  };
+
+  const unacked = anomalies.filter(a => !a.acknowledged);
+  const acked = anomalies.filter(a => a.acknowledged).slice(0, 5);
+
+  return (
+    <div className="space-y-2">
+      {unacked.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-6 gap-2 text-slate-600">
+          <Bell className="h-6 w-6 opacity-20" />
+          <span className="data-label">No active anomalies</span>
+        </div>
+      )}
+      <div className="space-y-2 max-h-52 overflow-y-auto op-scroll pr-0.5">
+      {unacked.slice(0, 30).map(a => {
+        const color = SEVERITY_COLORS[a.severity];
+        const DomainIcon = DOMAIN_ICONS[a.domain] ?? AlertTriangle;
+        return (
+          <div
+            key={a.id}
+            className="rounded p-2.5 space-y-1"
+            style={{ background: `${color}08`, border: `1px solid ${color}30` }}
+          >
+            <div className="flex items-center gap-2">
+              <DomainIcon className="h-3 w-3 shrink-0" style={{ color }} />
+              <span className="data-value flex-1" style={{ color, fontSize: "0.72rem" }}>{a.title}</span>
+              <span className="data-label uppercase tracking-wider" style={{ color, fontSize: "0.6rem" }}>{a.severity}</span>
+              <button
+                className="rounded p-0.5 text-slate-600 hover:text-slate-300 transition-colors"
+                onClick={() => acknowledgeAnomaly(a.id)}
+                title="Acknowledge"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="data-label text-slate-400">{a.description}</div>
+            <div className="flex items-center justify-between">
+              <span className="data-label text-slate-600">{a.entityName}</span>
+              <span className="data-label text-slate-600">{toRelativeTime(a.detectedAt)}</span>
+            </div>
+          </div>
+        );
+      })}
+      </div>
+      {unacked.length > 30 && (
+        <div className="data-label text-slate-600 text-center py-1">+{unacked.length - 30} more anomalies</div>
+      )}
+      {acked.length > 0 && (
+        <div className="border-t pt-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          <div className="data-label text-slate-600 uppercase tracking-widest mb-1">Acknowledged ({acked.length})</div>
+          {acked.map(a => (
+            <div key={a.id} className="flex items-center gap-2 py-1 opacity-40">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: SEVERITY_COLORS[a.severity] }} />
+              <span className="data-label text-slate-500 flex-1 truncate">{a.title}</span>
+              <span className="data-label text-slate-600">{toRelativeTime(a.detectedAt)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Timeline Scrubber ────────────────────────────────────────────────────────
+function TimelineScrubber() {
+  const timeline = useStore(s => s.timeline);
+  const setTimelineMode = useStore(s => s.setTimelineMode);
+  const setPlaybackTs = useStore(s => s.setPlaybackTs);
+  const setIsPlaying = useStore(s => s.setIsPlaying);
+  const setPlaybackSpeed = useStore(s => s.setPlaybackSpeed);
+
+  const AMBER = "#f59e0b";
+  const isLive = timeline.mode === "live";
+  const timestamps = timeline.availableTimestamps;
+
+  const currentIdx = timeline.playbackTs
+    ? timestamps.findIndex(t => t >= (timeline.playbackTs ?? 0))
+    : timestamps.length - 1;
+
+  const formatTs = (ts: number) => {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: "oklch(0.13 0.009 240 / 0.95)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      {/* Live/Replay toggle */}
+      <button
+        className="flex items-center gap-1.5 rounded px-2.5 py-1 data-label uppercase tracking-wider border transition-all shrink-0"
+        style={isLive
+          ? { background: "rgba(74,222,128,0.1)", borderColor: "rgba(74,222,128,0.4)", color: "#4ade80" }
+          : { background: `${AMBER}10`, borderColor: `${AMBER}40`, color: AMBER }
+        }
+        onClick={() => setTimelineMode(isLive ? "replay" : "live")}
+      >
+        {isLive ? <>
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 live-pulse" />
+          LIVE
+        </> : <>
+          <Clock className="h-3 w-3" />
+          REPLAY
+        </>}
+      </button>
+
+      {/* Playback controls (replay only) */}
+      {!isLive && (
+        <>
+          <button
+            className="rounded p-1 border border-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+            onClick={() => {
+              const idx = Math.max(0, currentIdx - 1);
+              setPlaybackTs(timestamps[idx] ?? null);
+            }}
+          >
+            <SkipBack className="h-3 w-3" />
+          </button>
+          <button
+            className="rounded p-1 border border-white/10 text-slate-400 hover:text-slate-200 transition-colors"
+            onClick={() => setIsPlaying(!timeline.isPlaying)}
+          >
+            {timeline.isPlaying ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+          </button>
+
+          {/* Speed selector */}
+          <div className="flex items-center gap-0.5">
+            {([1, 2, 5, 10] as const).map(s => (
+              <button
+                key={s}
+                className="rounded px-1.5 py-0.5 data-label border transition-all"
+                style={timeline.playbackSpeed === s
+                  ? { background: `${AMBER}18`, borderColor: `${AMBER}40`, color: AMBER }
+                  : { background: "transparent", borderColor: "rgba(255,255,255,0.06)", color: "rgba(148,163,184,0.4)" }
+                }
+                onClick={() => setPlaybackSpeed(s)}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+
+          {/* Scrubber */}
+          {timestamps.length > 1 && (
+            <>
+              <span className="data-label text-slate-600 shrink-0">{timestamps[0] ? formatTs(timestamps[0]) : ""}</span>
+              <input
+                type="range"
+                min={0}
+                max={timestamps.length - 1}
+                value={Math.max(0, currentIdx)}
+                className="flex-1 accent-amber-400"
+                onChange={e => {
+                  const idx = parseInt(e.target.value, 10);
+                  setPlaybackTs(timestamps[idx] ?? null);
+                }}
+              />
+              <span className="data-label text-slate-400 shrink-0">
+                {timeline.playbackTs ? formatTs(timeline.playbackTs) : "Now"}
+              </span>
+            </>
+          )}
+          {timestamps.length <= 1 && (
+            <span className="data-label text-slate-600">History loading... ({timestamps.length} snapshots)</span>
+          )}
+        </>
+      )}
+
+      {isLive && (
+        <span className="data-label text-slate-600 flex-1 text-center">
+          {timestamps.length > 0 ? `${timestamps.length} history snapshots available` : "Building history buffer..."}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ─── Webcam List ──────────────────────────────────────────────────────────────
 function WebcamList() {
   const webcams = useStore(s => s.webcams);
@@ -361,8 +629,13 @@ function EntityDetailPanel() {
     </div>
   );
 
+  const vessels = useStore(s => s.vessels);
   const dataMap: Record<string, any[]> = { aircraft, satellites, webcams, earthquakes };
-  const item = dataMap[selectedEntity.type]?.find((i: any) => i.id === selectedEntity.id);
+  // Vessels use mmsi as id
+  let item: any = dataMap[selectedEntity.type]?.find((i: any) => i.id === selectedEntity.id);
+  if (!item && selectedEntity.type === "vessels") {
+    item = vessels.find(v => v.mmsi === selectedEntity.id);
+  }
   if (!item) return null;
 
   const renderDetail = () => {
@@ -464,6 +737,45 @@ function EntityDetailPanel() {
               View on USGS →
             </a>
           )}
+        </div>
+      );
+    }
+    if (selectedEntity.type === "vessels") {
+      const v = item;
+      const VESSEL_COLORS: Record<string, string> = {
+        cargo: "#60a5fa", tanker: "#f97316", passenger: "#a78bfa",
+        military: "#ef4444", sar: "#4ade80", fishing: "#fbbf24",
+        pleasure: "#f0abfc", tug: "#94a3b8", other: "#64748b",
+      };
+      const color = VESSEL_COLORS[v.typeCategory] ?? "#64748b";
+      return (
+        <div className="space-y-2.5">
+          <div className="flex items-start gap-2">
+            <div>
+              <div className="data-value text-base" style={{ color }}>{v.name || v.mmsi}</div>
+              <div className="data-label text-slate-400">{v.flag} · {v.typeName}</div>
+            </div>
+            <div className="ml-auto">
+              <span className="rounded px-1.5 py-0.5 data-label uppercase tracking-wider" style={{ background: `${color}18`, border: `1px solid ${color}40`, color }}>{v.typeCategory}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {[
+              ["SPEED", v.speed != null ? `${v.speed.toFixed(1)} kn` : "—"],
+              ["HDG", formatNum(v.heading, "°", 0)],
+              ["LAT", formatNum(v.latitude, "°", 3)],
+              ["LON", formatNum(v.longitude, "°", 3)],
+              ["DEST", v.destination || "—"],
+              ["STATUS", v.statusName || "—"],
+            ].map(([k, val]) => (
+              <div key={k} className="rounded p-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="data-label text-slate-500">{k}</div>
+                <div className="data-value" style={{ color }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          {v.length && <div className="data-label text-slate-600">LOA: {v.length}m · Beam: {v.width}m · Draught: {v.draught}m</div>}
+          <div className="data-label text-slate-600">MMSI: {v.mmsi} · {v.source}</div>
         </div>
       );
     }
@@ -717,6 +1029,9 @@ export default function WorldView() {
   useWorldViewSocket();
 
   const { panels, togglePanel, activeTab, setActiveTab, aircraft, satellites, earthquakes, webcams } = useStore();
+  const vessels = useStore(s => s.vessels);
+  const anomalies = useStore(s => s.anomalies);
+  const unacknowledgedAnomalyCount = useStore(s => s.unacknowledgedAnomalyCount);
   const layers = useStore(s => s.layers);
   const updateLayer = useStore(s => s.updateLayer);
   const setVisualMode = useStore(s => s.setVisualMode);
@@ -740,6 +1055,7 @@ export default function WorldView() {
 
   const tabs = [
     { key: "aircraft", label: "Aircraft", icon: Plane, count: aircraft.length, color: CYAN },
+    { key: "vessels", label: "Maritime", icon: Ship, count: vessels.length, color: "#60a5fa" },
     { key: "satellites", label: "Sats", icon: Satellite, count: satellites.length, color: "#fbbf24" },
     { key: "earthquakes", label: "Quakes", icon: AlertTriangle, count: earthquakes.length, color: "#ef4444" },
     { key: "webcams", label: "Cams", icon: Camera, count: webcams.length, color: "#4ade80" },
@@ -832,6 +1148,15 @@ export default function WorldView() {
               />
             </div>
 
+            {/* Anomaly Alert Panel */}
+            <OpPanel
+              title={`Anomalies${unacknowledgedAnomalyCount > 0 ? ` (${unacknowledgedAnomalyCount})` : ""}`}
+              icon={Bell}
+              accentColor={unacknowledgedAnomalyCount > 0 ? "#ef4444" : "#64748b"}
+            >
+              <AnomalyPanel />
+            </OpPanel>
+
             {/* Layers */}
             <OpPanel title="Layers" icon={Layers} accentColor={CYAN}>
               <div className="flex flex-wrap gap-1.5">
@@ -840,6 +1165,7 @@ export default function WorldView() {
                 <LayerToggle layerKey="earthquakes" label="Quakes" icon={AlertTriangle} accentColor="#ef4444" />
                 <LayerToggle layerKey="webcams" label="Cams" icon={Camera} accentColor="#4ade80" />
                 <LayerToggle layerKey="weather" label="Weather" icon={Cloud} accentColor="#7dd3fc" />
+                <LayerToggle layerKey="vessels" label="Vessels" icon={Ship} accentColor="#60a5fa" />
               </div>
               <div className="mt-2 space-y-1.5">
                 {layers.aircraft.visible && (
@@ -867,6 +1193,12 @@ export default function WorldView() {
                     <span className="w-6 text-red-300">{minMag}</span>
                   </div>
                 )}
+              {layers.vessels?.visible && (
+                <label className="flex items-center gap-2 data-label text-slate-400 cursor-pointer">
+                  <input type="checkbox" className="accent-blue-400" checked={layers.vessels?.showTrails ?? false} onChange={e => updateLayer("vessels" as any, { showTrails: e.target.checked })} />
+                  Show vessel trails
+                </label>
+              )}
               </div>
             </OpPanel>
 
@@ -914,6 +1246,7 @@ export default function WorldView() {
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10 pointer-events-none">
             {[
               { icon: Plane, count: aircraft.length, color: CYAN, label: "AC" },
+              { icon: Ship, count: vessels.length, color: "#60a5fa", label: "VES" },
               { icon: Satellite, count: satellites.length, color: "#fbbf24", label: "SAT" },
               { icon: AlertTriangle, count: earthquakes.length, color: "#ef4444", label: "EQ" },
               { icon: Camera, count: webcams.length, color: "#4ade80", label: "CAM" },
@@ -967,6 +1300,9 @@ export default function WorldView() {
         {panels.bottom ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
       </button>
 
+      {/* Timeline Scrubber */}
+      <TimelineScrubber />
+
       {/* Bottom Panel */}
       {panels.bottom && (
         <div className="shrink-0 z-10" style={{ height: "22rem", background: "oklch(0.13 0.009 240 / 0.95)", borderTop: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(12px)" }}>
@@ -1003,6 +1339,7 @@ export default function WorldView() {
             {/* List */}
             <div className="w-80 shrink-0 overflow-y-auto op-scroll p-2" style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}>
               {activeTab === "aircraft" && <AircraftList />}
+              {activeTab === "vessels" && <VesselList />}
               {activeTab === "satellites" && <SatelliteList />}
               {activeTab === "earthquakes" && <EarthquakeList />}
               {activeTab === "webcams" && <WebcamList />}

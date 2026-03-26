@@ -187,8 +187,65 @@ export interface FeedStatus {
 }
 
 export interface SelectedEntity {
-  type: "aircraft" | "satellites" | "webcams" | "earthquakes";
+  type: "aircraft" | "satellites" | "webcams" | "earthquakes" | "vessels";
   id: string;
+}
+
+// ─── Vessel / Maritime ────────────────────────────────────────────────────────
+export type VesselCategory = "cargo" | "tanker" | "passenger" | "military" | "sar" | "fishing" | "pleasure" | "tug" | "other";
+
+export interface Vessel {
+  mmsi: string;
+  name: string;
+  callsign: string;
+  flag: string;
+  type: number;
+  typeName: string;
+  typeCategory: VesselCategory;
+  latitude: number;
+  longitude: number;
+  speed: number | null;
+  heading: number | null;
+  course: number | null;
+  status: number | null;
+  statusName: string;
+  destination: string;
+  draught: number | null;
+  length: number | null;
+  width: number | null;
+  trail: number[][];
+  last_seen: string;
+  source: string;
+}
+
+// ─── Anomaly ──────────────────────────────────────────────────────────────────
+export type AnomalySeverity = "info" | "warning" | "critical";
+export type AnomalyDomain = "aircraft" | "maritime" | "earthquake" | "satellite";
+
+export interface Anomaly {
+  id: string;
+  domain: AnomalyDomain;
+  severity: AnomalySeverity;
+  type: string;
+  title: string;
+  description: string;
+  entityId: string;
+  entityName: string;
+  latitude: number | null;
+  longitude: number | null;
+  detectedAt: string;
+  acknowledged: boolean;
+  metadata: Record<string, unknown>;
+}
+
+// ─── Timeline / Playback ──────────────────────────────────────────────────────
+export interface TimelineState {
+  mode: "live" | "replay";
+  playbackTs: number | null; // null = live
+  isPlaying: boolean;
+  playbackSpeed: 1 | 2 | 5 | 10;
+  availableTimestamps: number[];
+  historyLoaded: boolean;
 }
 
 export interface LayerConfig {
@@ -224,18 +281,40 @@ interface WorldViewState {
     webcams: LayerConfig;
     earthquakes: LayerConfig;
     weather: LayerConfig;
+    vessels: LayerConfig;
   };
   selectedEntity: SelectedEntity | null;
   imageryPreset: "ion" | "osm" | "dark";
   visualMode: "normal" | "green" | "mono";
   theme: "dark" | "light";
   panels: { left: boolean; right: boolean; bottom: boolean };
-  activeTab: "aircraft" | "satellites" | "earthquakes" | "webcams" | "weather";
+  activeTab: "aircraft" | "vessels" | "satellites" | "earthquakes" | "webcams" | "weather";
   filters: {
     globalSearch: string;
     earthquakes: { minMagnitude: number };
-    aircraft: { classFilter: "all" | "military" | "civilian" };
+    aircraft: {
+      classFilter: "all" | "military" | "civilian";
+      minAltitude: number | null;
+      maxAltitude: number | null;
+      minSpeed: number | null;
+      maxSpeed: number | null;
+    };
+    vessels: {
+      categoryFilter: "all" | VesselCategory;
+      minSpeed: number | null;
+      maxSpeed: number | null;
+    };
   };
+
+  // Vessel data
+  vessels: Vessel[];
+
+  // Anomalies
+  anomalies: Anomaly[];
+  unacknowledgedAnomalyCount: number;
+
+  // Timeline
+  timeline: TimelineState;
 
   // Ruler tool
   ruler: RulerState;
@@ -261,7 +340,26 @@ interface WorldViewState {
   setGlobalSearch: (s: string) => void;
   setMinMagnitude: (m: number) => void;
   setAircraftClassFilter: (f: "all" | "military" | "civilian") => void;
+  setAircraftAltFilter: (min: number | null, max: number | null) => void;
+  setAircraftSpeedFilter: (min: number | null, max: number | null) => void;
+  setVesselCategoryFilter: (f: "all" | VesselCategory) => void;
+  setVesselSpeedFilter: (min: number | null, max: number | null) => void;
   clearSelection: () => void;
+
+  // Vessel actions
+  setVessels: (v: Vessel[]) => void;
+
+  // Anomaly actions
+  setAnomalies: (a: Anomaly[]) => void;
+  addAnomalies: (a: Anomaly[]) => void;
+  acknowledgeAnomaly: (id: string) => void;
+
+  // Timeline actions
+  setTimelineMode: (mode: "live" | "replay") => void;
+  setPlaybackTs: (ts: number | null) => void;
+  setIsPlaying: (playing: boolean) => void;
+  setPlaybackSpeed: (speed: 1 | 2 | 5 | 10) => void;
+  setAvailableTimestamps: (ts: number[]) => void;
 
   // Ruler actions
   toggleRuler: () => void;
@@ -311,6 +409,7 @@ const useStore = create<WorldViewState>((set) => ({
     webcams: { visible: true, clustering: false, maxVisible: 60 },
     earthquakes: { visible: true, showLabels: false, clustering: false, maxVisible: 150 },
     weather: { visible: true, opacity: 0.55 },
+    vessels: { visible: true, showTrails: true, showLabels: false, clustering: false, maxVisible: 500 },
   },
   selectedEntity: null,
   imageryPreset: "osm",
@@ -321,7 +420,19 @@ const useStore = create<WorldViewState>((set) => ({
   filters: {
     globalSearch: "",
     earthquakes: { minMagnitude: 2 },
-    aircraft: { classFilter: "all" },
+    aircraft: { classFilter: "all", minAltitude: null, maxAltitude: null, minSpeed: null, maxSpeed: null },
+    vessels: { categoryFilter: "all", minSpeed: null, maxSpeed: null },
+  },
+  vessels: [],
+  anomalies: [],
+  unacknowledgedAnomalyCount: 0,
+  timeline: {
+    mode: "live",
+    playbackTs: null,
+    isPlaying: false,
+    playbackSpeed: 1,
+    availableTimestamps: [],
+    historyLoaded: false,
   },
   ruler: {
     active: false,
@@ -373,8 +484,40 @@ const useStore = create<WorldViewState>((set) => ({
   setMinMagnitude: (minMagnitude) =>
     set((state) => ({ filters: { ...state.filters, earthquakes: { ...state.filters.earthquakes, minMagnitude } } })),
   setAircraftClassFilter: (classFilter) =>
-    set((state) => ({ filters: { ...state.filters, aircraft: { classFilter } } })),
+    set((state) => ({ filters: { ...state.filters, aircraft: { ...state.filters.aircraft, classFilter } } })),
+  setAircraftAltFilter: (minAltitude, maxAltitude) =>
+    set((state) => ({ filters: { ...state.filters, aircraft: { ...state.filters.aircraft, minAltitude, maxAltitude } } })),
+  setAircraftSpeedFilter: (minSpeed, maxSpeed) =>
+    set((state) => ({ filters: { ...state.filters, aircraft: { ...state.filters.aircraft, minSpeed, maxSpeed } } })),
+  setVesselCategoryFilter: (categoryFilter) =>
+    set((state) => ({ filters: { ...state.filters, vessels: { ...state.filters.vessels, categoryFilter } } })),
+  setVesselSpeedFilter: (minSpeed, maxSpeed) =>
+    set((state) => ({ filters: { ...state.filters, vessels: { ...state.filters.vessels, minSpeed, maxSpeed } } })),
   clearSelection: () => set({ selectedEntity: null }),
+
+  setVessels: (vessels) => set({ vessels }),
+  setAnomalies: (anomalies) => set({
+    anomalies,
+    unacknowledgedAnomalyCount: anomalies.filter(a => !a.acknowledged).length,
+  }),
+  addAnomalies: (newAnomalies) => set((state) => {
+    const merged = [...newAnomalies, ...state.anomalies].slice(0, 100);
+    return { anomalies: merged, unacknowledgedAnomalyCount: merged.filter(a => !a.acknowledged).length };
+  }),
+  acknowledgeAnomaly: (id) => set((state) => {
+    const anomalies = state.anomalies.map(a => a.id === id ? { ...a, acknowledged: true } : a);
+    return { anomalies, unacknowledgedAnomalyCount: anomalies.filter(a => !a.acknowledged).length };
+  }),
+
+  setTimelineMode: (mode) => set((state) => ({
+    timeline: { ...state.timeline, mode, playbackTs: mode === "live" ? null : state.timeline.playbackTs },
+  })),
+  setPlaybackTs: (playbackTs) => set((state) => ({ timeline: { ...state.timeline, playbackTs } })),
+  setIsPlaying: (isPlaying) => set((state) => ({ timeline: { ...state.timeline, isPlaying } })),
+  setPlaybackSpeed: (playbackSpeed) => set((state) => ({ timeline: { ...state.timeline, playbackSpeed } })),
+  setAvailableTimestamps: (availableTimestamps) => set((state) => ({
+    timeline: { ...state.timeline, availableTimestamps, historyLoaded: availableTimestamps.length > 0 },
+  })),
 
   // Ruler actions
   toggleRuler: () => set((state) => ({
