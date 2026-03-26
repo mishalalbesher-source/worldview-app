@@ -41,11 +41,13 @@ export function useWorldViewSocket() {
 
   useEffect(() => {
     const socket = io(window.location.origin, {
-      path: "/socket.io",
+      // Do NOT set path - use Socket.IO default (/socket.io/)
       transports: ["polling", "websocket"],
       reconnectionDelay: 2000,
       reconnectionDelayMax: 30000,
+      timeout: 20000,
       upgrade: true,
+      forceNew: true,
     });
     socketRef.current = socket;
     setStatus("connecting");

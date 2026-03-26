@@ -86,3 +86,8 @@
 - [x] Webcam icon (36px camera body with lens + recording dot, location name label always visible)
 - [x] Military aircraft use distinct color/icon vs civilian (orange/red delta-wing vs cyan airliner)
 - [x] Save checkpoint and redeploy
+
+## Production Signal Fix (Persistent)
+- [x] Deep-diagnose Socket.IO handshake on production domain
+- [x] Fix Socket.IO transport/CORS for production - removed explicit path, added serveStatic exclusion
+- [x] Verify data feeds work on published site
